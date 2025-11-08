@@ -4,6 +4,8 @@ import google.generativeai as genai
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
+
+
 # -----------------------------------------------------------------
 # 1. SETUP - Page Config and Secrets
 # -----------------------------------------------------------------
@@ -69,7 +71,7 @@ def get_gemini_model():
     """Configures and returns the Gemini generative model."""
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-pro")
         return model
     except Exception as e:
         st.error(f"Error setting up Gemini model: {e}")
