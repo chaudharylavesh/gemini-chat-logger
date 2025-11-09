@@ -18,18 +18,55 @@ st.set_page_config(
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     SERVICE_ACCOUNT_JSON = st.secrets["SERVICE_ACCOUNT_JSON"]
-    SHEET_ID = st.secrets["SHEET_ID"] # <-- We are now using the ID
-    
-    # We still keep SHEET_NAME as a fallback and for the error message
-    SHEET_NAME = st.secrets.get("SHEET_NAME", "ChatLogs") 
+    SHEET_ID = st.secrets["SHEET_ID"]
+    SHEET_NAME = st.secrets.get("SHEET_NAME", "ChatTest") 
 
 except KeyError as e:
-    st.error(f"ERROR: Missing secret: {e}. Please add it in your app's Settings -> Secrets.")
+    st.error(f"ERROR: Missing secret: {e}.")
     st.info("You must have GEMINI_API_KEY, SERVICE_ACCOUNT_JSON, and SHEET_ID.")
     st.stop()
 
-# Define the system prompt for the chatbot
-SYSTEM_PROMPT = """You are Dr. Huberman AI...""" # (Your prompt)
+# --- 
+# --- 
+# --- THIS IS THE NEW DEBUG BOX ---
+# --- 
+# --- 
+st.header("Admin: Final Sanity Check")
+st.warning("Please verify these 3 values *exactly*.")
+with st.container(border=True):
+    try:
+        st.markdown(f"""
+        **1. Project ID:**
+        
+        `{SERVICE_ACCOUNT_JSON['project_id']}`
+        
+        *Is this the project where you enabled the Drive & Sheets APIs?*
+        """)
+        
+        st.markdown(f"""
+        **2. Service Account Email:**
+        
+        `{SERVICE_ACCOUNT_JSON['client_email']}`
+        
+        *Did you share your Google Sheet with this exact email?*
+        """)
+        
+        st.markdown(f"""
+        **3. Sheet ID the App is Using:**
+        
+        `{SHEET_ID}`
+        
+        *Does this match the ID in your sheet's URL perfectly? (No spaces, no extra chars)*
+        """)
+    except Exception as e:
+        st.error(f"Could not read secrets, check formatting: {e}")
+
+st.divider()
+# --- 
+# --- 
+# --- END OF DEBUG BOX ---
+# --- 
+# --- 
 
 # -----------------------------------------------------------------
 # 2. BACKEND FUNCTIONS - Google Sheets & Gemini
@@ -37,7 +74,6 @@ SYSTEM_PROMPT = """You are Dr. Huberman AI...""" # (Your prompt)
 
 @st.cache_resource
 def setup_google_sheets_client():
-    """Sets up and returns an authorized gspread client."""
     try:
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
@@ -54,18 +90,14 @@ def setup_google_sheets_client():
         return None
 
 def log_chat_to_sheet(client, user_message, bot_response):
-    """Logs a single chat exchange to the Google Sheet."""
-    if client is None:
-        return
+    if client is None: return
     try:
-        # --- THIS IS THE NEW LOGIC ---
         # Try to open by the unique ID first
         sheet = client.open_by_key(SHEET_ID).sheet1
         
     except Exception as e:
         st.error(f"Error opening sheet by ID. Trying by name... Error: {e}")
         try:
-            # Fallback to opening by name if ID fails
             sheet = client.open(SHEET_NAME).sheet1
         except gspread.exceptions.SpreadsheetNotFound:
             st.error(f"Error: Spreadsheet '{SHEET_NAME}' not found. Check name and sharing.")
@@ -74,7 +106,6 @@ def log_chat_to_sheet(client, user_message, bot_response):
             st.error(f"Error opening sheet by name: {e_name}")
             return
 
-    # If successful, append the row
     try:
         timestamp = datetime.now().isoformat()
         sheet.append_row([timestamp, user_message, bot_response])
@@ -83,7 +114,6 @@ def log_chat_to_sheet(client, user_message, bot_response):
 
 @st.cache_resource
 def get_gemini_model():
-    """Configures and returns the Gemini generative model."""
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel("models/gemini-pro-latest")
@@ -98,23 +128,12 @@ def get_gemini_model():
 
 st.title("🧠 Dr. Huberman AI")
 
-# --- DEBUG INFO BOX ---
-# This will print the exact email the app is using.
-try:
-    APP_EMAIL = SERVICE_ACCOUNT_JSON['client_email']
-    st.info(f"App is running as: **{APP_EMAIL}**\n\nPlease verify this *exact* email is an **Editor** on your Google Sheet.", icon="ℹ️")
-except Exception as e:
-    st.error(f"Could not read client_email from secrets: {e}")
-
-# Initialize the gspread client and Gemini model
 gs_client = setup_google_sheets_client()
 gemini_model = get_gemini_model()
 
-# Initialize chat history in session state
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# (Rest of the chat UI code is identical)
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -139,7 +158,6 @@ if prompt := st.chat_input("Ask about neuroscience, habits, or health:"):
                 st.markdown(bot_response)
                 st.session_state.chat_history.append({"role": "assistant", "content": bot_response})
                 
-                # Log the conversation
                 log_chat_to_sheet(gs_client, prompt, bot_response)
                 
             except Exception as e:
