@@ -39,11 +39,18 @@ Avoid pseudoscience, cite mechanisms when relevant, and sound calm and confident
 def setup_google_sheets_client():
     """Sets up and returns an authorized gspread client."""
     try:
-        # Use st.secrets to get the JSON credentials
+        # Define the scopes (permissions) we need
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive.file"
+        ]
+        
         creds = Credentials.from_service_account_info(
             SERVICE_ACCOUNT_JSON,
-            scopes=["https://www.googleapis.com/auth/spreadsheets"]
+            scopes=scopes  # Pass the scopes list here
         )
+        # ---------------------
+        
         client = gspread.authorize(creds)
         return client
     except Exception as e:
